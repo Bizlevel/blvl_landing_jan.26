@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1E3A5F" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <circle cx="980" cy="120" r="220" fill="url(#accent)" opacity="0.35" />
+  <circle cx="220" cy="560" r="240" fill="url(#accent)" opacity="0.25" />
+  <text x="120" y="250" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="700">
+    87525;
+  </text>
+  <text x="120" y="320" fill="#E2E8F0" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="500">
+    @>:0G09 187=5A-=02K:8 70 8 <8=CB 2 45=L
+  </text>
+  <text x="120" y="380" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="24">
+    AI-B@5=5@ � <8:@>;Q@=8=3 � 3>B>2K5 8=AB@C<5=BK
+  </text>
+</svg>
