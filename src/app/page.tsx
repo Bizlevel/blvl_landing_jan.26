@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView, AnimatePresence } from "framer-motion";
+import { motion, useInView, AnimatePresence, useMotionValue, useSpring, useTransform, useScroll } from "framer-motion";
 import {
   Clock,
   BookOpen,
@@ -28,7 +28,16 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type ReactNode,
+  type MouseEvent,
+  type CSSProperties,
+} from "react";
 import iphoneFrame from "./assets/apple-iphone-17-pro-max-2025-medium.png";
 import logoLight from "./assets/logo_light.png";
 import qrTemplate from "./assets/qr_template.png";
@@ -38,12 +47,352 @@ import qrTemplate from "./assets/qr_template.png";
 // import maxAvatar from "./assets/max-avatar.png";
 // import rayAvatar from "./assets/ray-avatar.png";
 
+type HlsConstructor = typeof import("hls.js").default;
+type HlsInstance = InstanceType<HlsConstructor>;
+
+// ========================================
+// PHASE 1: WOW Effects Components
+// ========================================
+
+// Cursor Glow Effect
+function CursorGlow() {
+  const x = useMotionValue(-9999);
+  const y = useMotionValue(-9999);
+  const opacity = useMotionValue(0);
+  const opacitySpring = useSpring(opacity, { stiffness: 200, damping: 20 });
+  const rafRef = useRef<number | null>(null);
+  const latestPosRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: globalThis.MouseEvent) => {
+      latestPosRef.current = { x: e.clientX, y: e.clientY };
+      if (rafRef.current !== null) return;
+      rafRef.current = requestAnimationFrame(() => {
+        const { x: latestX, y: latestY } = latestPosRef.current;
+        x.set(latestX - 200);
+        y.set(latestY - 200);
+        opacity.set(1);
+        rafRef.current = null;
+      });
+    };
+
+    const handleMouseLeave = () => {
+      opacity.set(0);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    document.body.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      document.body.removeEventListener("mouseleave", handleMouseLeave);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [x, y, opacity]);
+
+  return (
+    <motion.div
+      className="pointer-events-none fixed z-50 h-[400px] w-[400px] rounded-full cursor-glow"
+      style={{
+        background: "radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)",
+        x,
+        y,
+        opacity: opacitySpring,
+      }}
+    />
+  );
+}
+
+// Aurora Background
+function AuroraBackground() {
+  return (
+    <div className="aurora-bg">
+      <motion.div
+        className="aurora-blob absolute -left-40 top-20 h-[600px] w-[600px] bg-blue-600/20"
+        animate={{
+          x: [0, 100, 50, 0],
+          y: [0, 50, 100, 0],
+          scale: [1, 1.2, 0.9, 1],
+        }}
+        transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="aurora-blob absolute -right-40 top-40 h-[500px] w-[500px] bg-purple-600/15"
+        animate={{
+          x: [0, -80, -40, 0],
+          y: [0, 80, 40, 0],
+          scale: [1, 0.9, 1.1, 1],
+        }}
+        transition={{ duration: 25, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+      />
+      <motion.div
+        className="aurora-blob absolute bottom-20 left-1/4 h-[450px] w-[450px] bg-amber-500/10"
+        animate={{
+          x: [0, 60, -30, 0],
+          y: [0, -60, 30, 0],
+          scale: [1, 1.15, 0.95, 1],
+        }}
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 4 }}
+      />
+      <motion.div
+        className="aurora-blob absolute right-1/4 top-1/3 h-[350px] w-[350px] bg-cyan-500/10"
+        animate={{
+          x: [0, -50, 25, 0],
+          y: [0, 70, -35, 0],
+          scale: [1, 0.85, 1.1, 1],
+        }}
+        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut", delay: 6 }}
+      />
+    </div>
+  );
+}
+
+// Magnetic Button
+function MagneticButton({ 
+  children, 
+  className = "", 
+  href,
+  onClick,
+}: { 
+  children: ReactNode; 
+  className?: string; 
+  href?: string;
+  onClick?: () => void;
+}) {
+  const ref = useRef<HTMLAnchorElement & HTMLButtonElement>(null);
+  const rectRef = useRef<DOMRect | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const latestPosRef = useRef({ x: 0, y: 0 });
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const springConfig = { damping: 15, stiffness: 150 };
+  const xSpring = useSpring(x, springConfig);
+  const ySpring = useSpring(y, springConfig);
+
+  const handleMouseMove = (e: MouseEvent) => {
+    latestPosRef.current = { x: e.clientX, y: e.clientY };
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      if (!ref.current) return;
+      if (!rectRef.current) {
+        rectRef.current = ref.current.getBoundingClientRect();
+      }
+      const rect = rectRef.current;
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const distanceX = (latestPosRef.current.x - centerX) * 0.3;
+      const distanceY = (latestPosRef.current.y - centerY) * 0.3;
+      x.set(distanceX);
+      y.set(distanceY);
+      rafRef.current = null;
+    });
+  };
+
+  const handleMouseEnter = () => {
+    if (ref.current) {
+      rectRef.current = ref.current.getBoundingClientRect();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+    rectRef.current = null;
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  };
+
+  const Component = href ? motion.a : motion.button;
+
+  return (
+    <Component
+      ref={ref as React.RefObject<HTMLAnchorElement & HTMLButtonElement>}
+      href={href}
+      onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{ x: xSpring, y: ySpring }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.98 }}
+      className={className}
+    >
+      {children}
+    </Component>
+  );
+}
+
+// Floating Particles around iPhone - fixed values to avoid hydration mismatch
+function FloatingParticles() {
+  // Fixed seed-like values to ensure server/client consistency
+  const particles = useMemo(() => [
+    { id: 0, left: "15%", delay: 0, duration: 3.5, size: 4, xOffset: -15 },
+    { id: 1, left: "25%", delay: 0.8, duration: 4, size: 5, xOffset: 10 },
+    { id: 2, left: "35%", delay: 1.6, duration: 3.2, size: 3, xOffset: -8 },
+    { id: 3, left: "45%", delay: 2.4, duration: 4.5, size: 6, xOffset: 12 },
+    { id: 4, left: "55%", delay: 0.4, duration: 3.8, size: 4, xOffset: -18 },
+    { id: 5, left: "65%", delay: 1.2, duration: 4.2, size: 5, xOffset: 15 },
+    { id: 6, left: "75%", delay: 2, duration: 3.6, size: 3, xOffset: -12 },
+    { id: 7, left: "85%", delay: 2.8, duration: 4.8, size: 6, xOffset: 8 },
+    { id: 8, left: "20%", delay: 3.2, duration: 3.4, size: 4, xOffset: -10 },
+    { id: 9, left: "50%", delay: 3.6, duration: 4.1, size: 5, xOffset: 14 },
+    { id: 10, left: "70%", delay: 1.8, duration: 3.9, size: 4, xOffset: -16 },
+    { id: 11, left: "40%", delay: 2.6, duration: 4.4, size: 5, xOffset: 11 },
+  ], []);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      {particles.map((particle) => (
+        <div
+          key={particle.id}
+          className="particle"
+          style={
+            {
+              left: particle.left,
+              bottom: "10%",
+              "--particle-x": `${particle.xOffset}px`,
+              "--particle-duration": `${particle.duration}s`,
+              "--particle-delay": `${particle.delay}s`,
+              "--particle-size": `${particle.size}px`,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+// ========================================
+// PHASE 2: Polish Components
+// ========================================
+
+// 3D Tilt Card
+function TiltCard({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const rectRef = useRef<DOMRect | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const latestPosRef = useRef({ x: 0, y: 0 });
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  // Increased tilt angle from 8 to 15 degrees for more visible effect
+  const rotateX = useTransform(y, [-0.5, 0.5], [15, -15]);
+  const rotateY = useTransform(x, [-0.5, 0.5], [-15, 15]);
+  
+  // Smooth spring for rotation
+  const springConfig = { stiffness: 150, damping: 15 };
+  const rotateXSpring = useSpring(rotateX, springConfig);
+  const rotateYSpring = useSpring(rotateY, springConfig);
+
+  const handleMouseMove = (e: MouseEvent) => {
+    latestPosRef.current = { x: e.clientX, y: e.clientY };
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      if (!ref.current) return;
+      if (!rectRef.current) {
+        rectRef.current = ref.current.getBoundingClientRect();
+      }
+      const rect = rectRef.current;
+      const xPos = (latestPosRef.current.x - rect.left) / rect.width - 0.5;
+      const yPos = (latestPosRef.current.y - rect.top) / rect.height - 0.5;
+      x.set(xPos);
+      y.set(yPos);
+      rafRef.current = null;
+    });
+  };
+
+  const handleMouseEnter = () => {
+    if (ref.current) {
+      rectRef.current = ref.current.getBoundingClientRect();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+    rectRef.current = null;
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  };
+
+  return (
+    <div style={{ perspective: 1000 }} className={className}>
+      <motion.div
+        ref={ref}
+        onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          rotateX: rotateXSpring,
+          rotateY: rotateYSpring,
+          transformStyle: "preserve-3d",
+        }}
+        whileHover={{ scale: 1.03 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className="h-full"
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
+// Typing Text Animation
+function TypingText({ text, delay = 0 }: { text: string; delay?: number }) {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const timeoutId = setTimeout(() => {
+      let i = 0;
+      intervalId = setInterval(() => {
+        if (i < text.length) {
+          setDisplayedText(text.slice(0, i + 1));
+          i++;
+        } else {
+          setIsComplete(true);
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
+        }
+      }, 50);
+    }, delay);
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      clearTimeout(timeoutId);
+    };
+  }, [text, delay]);
+
+  return (
+    <span>
+      {displayedText}
+      {!isComplete && <span className="typing-cursor" />}
+    </span>
+  );
+}
+
 const appStoreUrl =
   "https://apps.apple.com/app/id000000000?utm_source=landing";
 const googlePlayUrl =
   "https://play.google.com/store/apps/details?id=ru.bizlevel.app&utm_source=landing";
 const promoVideoUrl =
-  "https://vz-1d42f250-27d.b-cdn.net/dd827f44-82ef-4fc3-b0b0-3abee72dc7e6/playlist.m3u8";
+  "https://vz-1d42f250-27d.b-cdn.net/d15b6d05-01c6-4eed-ad06-10e0b2df67fe/playlist.m3u8";
 const promoVideoPoster =
   "https://vz-1d42f250-27d.b-cdn.net/dd827f44-82ef-4fc3-b0b0-3abee72dc7e6/thumbnail.jpg";
 const structuredData = {
@@ -53,7 +402,7 @@ const structuredData = {
   operatingSystem: "iOS, Android",
   applicationCategory: "BusinessApplication",
   description:
-    "Мобильное приложение для предпринимателей: короткие видео, AI-тренер и инструменты для бизнеса.",
+    "Мобильное приложение для предпринимателей: короткие видео, AI-тренер и артефакты для бизнеса.",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -85,13 +434,13 @@ const painPoints = [
 const solutionPoints = [
   {
     Icon: Zap,
-    title: "8 минут — и ты в деле",
+    title: "15 минут — и ты в деле",
     description:
       "Короткие видео без перегруза. Учишься между делами, а не «когда-нибудь».",
   },
   {
     Icon: Wrench,
-    title: "Инструмент сразу",
+    title: "Артефакт сразу",
     description:
       "После каждого уровня — чек-лист, шаблон или калькулятор для бизнеса.",
   },
@@ -117,9 +466,9 @@ const steps = [
     Icon: MessageCircle,
   },
   {
-    title: "Берёшь готовый инструмент",
+    title: "Берёшь готовый артефакт",
     description: "Чек-лист, шаблон или калькулятор — сразу внедряешь в бизнес.",
-    accent: "Инструмент",
+    accent: "Артефакт",
     Icon: ClipboardList,
   },
 ];
@@ -163,18 +512,68 @@ const skills = [
   },
 ];
 
-// Levels data for the tower
+// Levels data for the tower (Floor 1)
 const levels = [
-  { num: 1, name: "Старт", status: "free", desc: "Онбординг" },
-  { num: 2, name: "Финансы", status: "free", desc: "Денежный контроль" },
-  { num: 3, name: "Цели", status: "free", desc: "Целеполагание" },
-  { num: 4, name: "Продажи", status: "locked", desc: "Воронка продаж" },
-  { num: 5, name: "Команда", status: "locked", desc: "Найм и управление" },
-  { num: 6, name: "Маркетинг", status: "locked", desc: "Привлечение клиентов" },
-  { num: 7, name: "Процессы", status: "locked", desc: "Системность" },
-  { num: 8, name: "Масштаб", status: "locked", desc: "Рост бизнеса" },
-  { num: 9, name: "Лидерство", status: "locked", desc: "Управление людьми" },
-  { num: 10, name: "Стратегия", status: "locked", desc: "Долгосрочный план" },
+  {
+    num: 1,
+    name: "Стартовый рывок — осознание целей",
+    status: "free",
+    desc: "Артефакт: «ЯДРО ЦЕЛЕЙ»",
+  },
+  {
+    num: 2,
+    name: "Экспресс-стресс-менеджмент",
+    status: "free",
+    desc: "Артефакт: «5-МИНУТНЫЙ СТРЕСС-БРЕЙК»",
+  },
+  {
+    num: 3,
+    name: "Управление приоритетами (Эйзенхауэр)",
+    status: "free",
+    desc: "Артефакт: «МАТРИЦА ПРИОРИТЕТОВ»",
+  },
+  {
+    num: 4,
+    name: "Базовый учёт доходов/расходов",
+    status: "locked",
+    desc: "Артефакт: «БАЗОВЫЙ УЧЕТ»",
+  },
+  {
+    num: 5,
+    name: "Создание УТП",
+    status: "locked",
+    desc: "Артефакт: «ФОРМУЛА УТП»",
+  },
+  {
+    num: 6,
+    name: "Elevator Pitch (1-минутное представление)",
+    status: "locked",
+    desc: "Артефакт: «ELEVATOR PITCH»",
+  },
+  {
+    num: 7,
+    name: "Мини-планирование на неделю (SMART)",
+    status: "locked",
+    desc: "Артефакт: «ЧЕК-ЛИСТ НЕДЕЛЬНЫХ ЦЕЛЕЙ»",
+  },
+  {
+    num: 8,
+    name: "Блиц-опрос клиентов",
+    status: "locked",
+    desc: "Артефакт: «5 ВОПРОСОВ ПО БОЛИ КЛИЕНТА»",
+  },
+  {
+    num: 9,
+    name: "Административный иммунитет бизнеса",
+    status: "locked",
+    desc: "Артефакт: «АДМИНИСТРАТИВНЫЙ ОРГАНАЙЗЕР»",
+  },
+  {
+    num: 10,
+    name: "Моя карта ближайших действий",
+    status: "locked",
+    desc: "Артефакт: «КАРТА БЛИЖАЙШИХ ДЕЙСТВИЙ»",
+  },
 ];
 
 const mentors = [
@@ -226,7 +625,7 @@ const pillars = [
 const featureCards = [
   { 
     Icon: Clock, 
-    title: "8 минут в день", 
+    title: "15 минут в день", 
     description: "Коротко, по делу, встроится в график предпринимателя.",
     iconBg: "from-blue-500/20 to-blue-600/10",
     iconColor: "text-blue-400",
@@ -271,21 +670,34 @@ function AnimatedSection({
   children,
   className = "",
   delay = 0,
+  id,
+  parallax = false,
+  parallaxOffset = 50,
 }: {
   children: ReactNode;
   className?: string;
   delay?: number;
+  id?: string;
+  parallax?: boolean;
+  parallaxOffset?: number;
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+  const y = useTransform(scrollYProgress, [0, 1], [parallaxOffset, -parallaxOffset]);
 
   return (
     <motion.section
       ref={ref}
+      id={id}
       initial="hidden"
       animate={isInView ? "visible" : "hidden"}
       variants={fadeInUp}
       transition={{ duration: 0.6, ease: "easeOut", delay }}
+      style={parallax ? { y } : undefined}
       className={className}
     >
       {children}
@@ -324,46 +736,41 @@ function GlassCard({
 
 function LogoMark() {
   return (
-    <div className="flex items-center gap-3">
+    <Link 
+      href="/" 
+      className="flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 backdrop-blur-sm transition hover:border-white/25 hover:bg-white/10"
+    >
       <Image
         alt="БизЛевел"
-        className="h-8 w-auto"
+        className="h-8 w-auto object-contain"
         src={logoLight}
         priority
       />
-    </div>
+    </Link>
   );
 }
 
 function StoreButtons({ className = "" }: { className?: string }) {
   return (
     <div className={`flex flex-wrap gap-3 ${className}`}>
-      <motion.a
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.98 }}
-        className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10"
+      <MagneticButton
         href={appStoreUrl}
-        rel="noreferrer"
-        target="_blank"
+        className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10 gradient-border"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
         </svg>
         App Store
-      </motion.a>
-      <motion.a
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.98 }}
-        className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10"
+      </MagneticButton>
+      <MagneticButton
         href={googlePlayUrl}
-        rel="noreferrer"
-        target="_blank"
+        className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10 gradient-border"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M3 20.5v-17c0-.59.34-1.11.84-1.35L13.69 12l-9.85 9.85c-.5-.24-.84-.76-.84-1.35m13.81-5.38L6.05 21.34l8.49-8.49 2.27 2.27m3.35-4.31c.34.27.59.69.59 1.19s-.22.9-.57 1.18l-2.29 1.32-2.5-2.5 2.5-2.5 2.27 1.31M6.05 2.66l10.76 6.22-2.27 2.27-8.49-8.49z" />
         </svg>
         Google Play
-      </motion.a>
+      </MagneticButton>
     </div>
   );
 }
@@ -405,7 +812,7 @@ function GPTooltip() {
             exit={{ opacity: 0, y: 5 }}
             className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded-lg glass-panel p-3 text-xs text-slate-200 z-50"
           >
-            <strong className="text-amber-300">GP (Game Points)</strong> — баллы для открытия новых уровней и функций в приложении
+            <strong className="text-amber-300">GP (Growth Points)</strong> — баллы роста для открытия новых уровней и функций в приложении
             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45 h-2 w-2 glass-panel" />
           </motion.div>
         )}
@@ -445,15 +852,9 @@ function AvatarPlaceholder({
   );
 }
 
-// Background gradient blobs
+// Background gradient blobs (legacy - replaced by AuroraBackground)
 function BackgroundBlobs() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      <div className="absolute -left-40 top-20 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-[120px]" />
-      <div className="absolute -right-40 top-60 h-[400px] w-[400px] rounded-full bg-purple-600/10 blur-[100px]" />
-      <div className="absolute bottom-40 left-1/3 h-[350px] w-[350px] rounded-full bg-amber-500/8 blur-[100px]" />
-    </div>
-  );
+  return null; // Using AuroraBackground instead
 }
 
 // Noise texture overlay
@@ -491,14 +892,23 @@ export default function Home() {
   }, [isStepHovered]);
 
   useEffect(() => {
-    const handleScroll = () => {
+    let ticking = false;
+    const updateScroll = () => {
       const offset = window.scrollY;
       setIsScrolled(offset > 24);
       setShowSticky(offset > 420);
+      ticking = false;
     };
 
-    handleScroll();
-    window.addEventListener("scroll", handleScroll);
+    const handleScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(updateScroll);
+      }
+    };
+
+    updateScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -508,7 +918,7 @@ export default function Home() {
       return undefined;
     }
 
-    let hlsInstance: { destroy: () => void } | null = null;
+    let hlsInstance: HlsInstance | null = null;
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = promoVideoUrl;
@@ -554,7 +964,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-slate-100 selection:bg-blue-500/30 selection:text-white">
-      <BackgroundBlobs />
+      <CursorGlow />
+      <AuroraBackground />
       <NoiseTexture />
 
       <header
@@ -566,14 +977,12 @@ export default function Home() {
       >
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <LogoMark />
-          <motion.a
-            whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(245, 158, 11, 0.4)" }}
-            whileTap={{ scale: 0.98 }}
-            className="hidden rounded-full bg-[#F59E0B] px-6 py-3 text-sm font-semibold text-[#0B1220] shadow-lg shadow-amber-500/20 transition sm:inline-flex"
+          <MagneticButton
             href={appStoreUrl}
+            className="hidden rounded-full bg-[#F59E0B] px-6 py-3 text-sm font-semibold text-[#0B1220] shadow-lg shadow-amber-500/20 transition pulse-ring sm:inline-flex"
           >
             Скачать приложение
-          </motion.a>
+          </MagneticButton>
           <a
             className="inline-flex rounded-full border border-white/20 p-2 text-white/80 transition hover:bg-white/10 sm:hidden"
             href="#download"
@@ -616,8 +1025,8 @@ export default function Home() {
                 variants={fadeInUp}
                 className="text-lg leading-relaxed text-slate-300 md:text-xl"
               >
-                <strong className="text-white">8 минут в день.</strong> Это не курс и не марафон. Короткие видео,
-                персонализированный AI и готовые инструменты, которые ты
+                <strong className="text-white">15 минут в день.</strong> Это не курс и не марафон. Короткие видео,
+                персонализированный AI и готовые артефакты, которые ты
                 применяешь сразу в своём бизнесе.
               </motion.p>
               <motion.div
@@ -663,16 +1072,17 @@ export default function Home() {
               </motion.div>
             </motion.div>
 
-            {/* iPhone with video - кнопка Play всегда видна */}
+            {/* iPhone with video - animated border + floating particles */}
             <motion.div
               initial={{ opacity: 0, y: 40, scale: 0.95 }}
               animate={isHeroInView ? { opacity: 1, y: 0, scale: 1 } : {}}
               transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
               className="relative"
             >
+              <FloatingParticles />
               <div className="absolute -inset-8 rounded-[50px] bg-linear-to-br from-sky-500/25 via-blue-600/10 to-purple-500/5 blur-3xl" />
               <div className="absolute -inset-4 rounded-[45px] bg-linear-to-tr from-blue-500/20 to-transparent blur-2xl" />
-              <div className="relative mx-auto w-[320px]">
+              <div className="relative mx-auto w-[320px] animated-border">
                 <div className="absolute left-[5.5%] top-[1.8%] h-[96.4%] w-[89%] overflow-hidden rounded-[40px] bg-black">
                   <video
                     ref={videoRef}
@@ -729,8 +1139,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Features grid - разные цвета */}
-        <AnimatedSection className="mx-auto max-w-6xl px-6 pb-20">
+        {/* Features grid - 3D tilt cards */}
+        <AnimatedSection className="mx-auto max-w-6xl px-6 pb-20" parallax parallaxOffset={60}>
           <motion.div
             variants={staggerContainer}
             initial="hidden"
@@ -739,13 +1149,19 @@ export default function Home() {
             className="grid gap-6 md:grid-cols-3"
           >
             {featureCards.map((item, i) => (
-              <GlassCard key={item.title} className="rounded-2xl p-6" delay={i * 0.1} hoverGlow>
-                <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br ${item.iconBg}`}>
-                  <item.Icon className={`h-5 w-5 ${item.iconColor}`} />
-                </div>
-                <h3 className="text-lg font-semibold text-white">{item.title}</h3>
-                <p className="mt-2 text-sm text-slate-400">{item.description}</p>
-              </GlassCard>
+              <TiltCard key={item.title} className="h-full">
+                <motion.div
+                  variants={fadeInUp}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className="glass-panel glass-sheen gradient-border rounded-2xl p-6 h-full"
+                >
+                  <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br ${item.iconBg}`}>
+                    <item.Icon className={`h-5 w-5 ${item.iconColor}`} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">{item.title}</h3>
+                  <p className="mt-2 text-sm text-slate-400">{item.description}</p>
+                </motion.div>
+              </TiltCard>
             ))}
           </motion.div>
         </AnimatedSection>
@@ -906,13 +1322,14 @@ export default function Home() {
                             </div>
                           </div>
                         )}
-                        {/* Шаг Диалог - с аватаром Лео */}
+                        {/* Шаг Диалог - с typing animation */}
                         {activeStep === 1 && (
                           <div className="space-y-3 text-xs">
                             <div className="flex items-start gap-2 rounded-xl glass-panel px-3 py-2.5 text-slate-200">
                               <span className="shrink-0 text-lg">🦁</span>
                               <div>
-                                <span className="text-amber-300 font-medium">Лео:</span> Давай уточним цели бизнеса на 30 дней.
+                                <span className="text-amber-300 font-medium">Лео: </span>
+                                <TypingText text="Давай уточним цели бизнеса на 30 дней." delay={300} />
                               </div>
                             </div>
                             <div className="flex items-start gap-2 rounded-xl bg-amber-400/10 border border-amber-400/20 px-3 py-2.5 text-amber-100 ml-4">
@@ -924,7 +1341,8 @@ export default function Home() {
                             <div className="flex items-start gap-2 rounded-xl glass-panel px-3 py-2.5 text-slate-200">
                               <span className="shrink-0 text-lg">🦁</span>
                               <div>
-                                <span className="text-amber-300 font-medium">Лео:</span> Отлично. Начнём с диагностики воронки.
+                                <span className="text-amber-300 font-medium">Лео: </span>
+                                <TypingText text="Отлично. Начнём с диагностики воронки." delay={2000} />
                               </div>
                             </div>
                           </div>
@@ -994,7 +1412,7 @@ export default function Home() {
                 Твой путь в БизЛевел
               </h2>
               <p className="mt-3 text-sm text-slate-300">
-                10 уровней: финансы, продажи, команда, процессы. Первые 3 — бесплатно.
+                Первый этаж: 10 уровней с артефактами. Первые 3 — бесплатно. Дальше будут новые этажи.
               </p>
               <div className="mt-6 space-y-2">
                 {levels.slice(0, 6).map((level, index) => (
@@ -1075,7 +1493,7 @@ export default function Home() {
                     </div>
                     <div className="mt-2 h-2 rounded-full bg-white/10 overflow-hidden">
                       <motion.div
-                        className={`h-2 rounded-full bg-linear-to-r ${skill.color}`}
+                        className={`h-2 rounded-full bg-linear-to-r ${skill.color} shimmer-bar`}
                         initial={{ width: 0 }}
                         whileInView={{ width: `${skill.value * 10}%` }}
                         transition={{ duration: 0.8, delay: i * 0.1, ease: "easeOut" }}
@@ -1134,22 +1552,28 @@ export default function Home() {
 
             <div className="grid gap-4">
               {pillars.map((item, i) => (
-                <GlassCard key={item.title} className="rounded-2xl p-6" delay={i * 0.1} hoverGlow>
-                  <div className="mb-3 flex items-center gap-3 text-lg font-semibold text-white">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-blue-500/20 to-cyan-500/10">
-                      <item.Icon className="h-5 w-5 text-blue-400" />
+                <TiltCard key={item.title} className="h-full">
+                  <motion.div
+                    variants={fadeInUp}
+                    transition={{ delay: i * 0.1 }}
+                    className="glass-panel glass-sheen gradient-border rounded-2xl p-6 h-full"
+                  >
+                    <div className="mb-3 flex items-center gap-3 text-lg font-semibold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-blue-500/20 to-cyan-500/10">
+                        <item.Icon className="h-5 w-5 text-blue-400" />
+                      </div>
+                      {item.title}
                     </div>
-                    {item.title}
-                  </div>
-                  <p className="text-sm text-slate-300">{item.description}</p>
-                </GlassCard>
+                    <p className="text-sm text-slate-300">{item.description}</p>
+                  </motion.div>
+                </TiltCard>
               ))}
             </div>
           </motion.div>
         </AnimatedSection>
 
         {/* AI Trainers - с аватарами и hover эффектом */}
-        <AnimatedSection className="mx-auto max-w-6xl px-6 pb-24">
+        <AnimatedSection className="mx-auto max-w-6xl px-6 pb-24" parallax parallaxOffset={50}>
           <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
             Команда AI‑тренеров
           </h2>
@@ -1164,15 +1588,14 @@ export default function Home() {
             className="mt-8 grid gap-6 md:grid-cols-3"
           >
             {mentors.map((mentor, i) => (
-              <motion.div
-                key={mentor.name}
-                variants={fadeInUp}
-                whileHover={{ scale: 1.02 }}
-                onMouseEnter={() => setHoveredMentor(mentor.name)}
-                onMouseLeave={() => setHoveredMentor(null)}
-                className="relative"
-              >
-                <GlassCard className="rounded-2xl p-6 h-full" delay={i * 0.1} hoverGlow>
+              <TiltCard key={mentor.name} className="h-full">
+                <motion.div
+                  variants={fadeInUp}
+                  onMouseEnter={() => setHoveredMentor(mentor.name)}
+                  onMouseLeave={() => setHoveredMentor(null)}
+                  className="relative h-full"
+                >
+                  <div className="glass-panel glass-sheen gradient-border rounded-2xl p-6 h-full">
                   {/* Placeholder аватар - заменить на Image */}
                   <div className="mb-4">
                     <AvatarPlaceholder 
@@ -1190,31 +1613,32 @@ export default function Home() {
                   </div>
                   <p className="mt-3 text-sm text-slate-300">{mentor.description}</p>
                   
-                  {/* Hover example question */}
-                  <AnimatePresence>
-                    {hoveredMentor === mentor.name && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className={`mt-4 rounded-xl p-3 text-xs ${
-                          mentor.color === "amber" ? "bg-amber-500/10 border border-amber-500/20 text-amber-200" :
-                          mentor.color === "blue" ? "bg-blue-500/10 border border-blue-500/20 text-blue-200" :
-                          "bg-purple-500/10 border border-purple-500/20 text-purple-200"
-                        }`}
-                      >
-                        <span className="text-slate-400">Спроси:</span> {mentor.exampleQuestion}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </GlassCard>
-              </motion.div>
+                    {/* Hover example question */}
+                    <AnimatePresence>
+                      {hoveredMentor === mentor.name && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className={`mt-4 rounded-xl p-3 text-xs ${
+                            mentor.color === "amber" ? "bg-amber-500/10 border border-amber-500/20 text-amber-200" :
+                            mentor.color === "blue" ? "bg-blue-500/10 border border-blue-500/20 text-blue-200" :
+                            "bg-purple-500/10 border border-purple-500/20 text-purple-200"
+                          }`}
+                        >
+                          <span className="text-slate-400">Спроси:</span> {mentor.exampleQuestion}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              </TiltCard>
             ))}
           </motion.div>
         </AnimatedSection>
 
         {/* Final CTA - обновлённый */}
-        <AnimatedSection id="download" className="px-6 pb-28">
+        <AnimatedSection id="download" className="px-6 pb-28" parallax parallaxOffset={40}>
           <motion.div
             whileHover={{ boxShadow: "0 40px 100px rgba(245, 158, 11, 0.2)" }}
             className="mx-auto max-w-6xl rounded-[32px] glass-strong glass-sheen bg-linear-to-br from-amber-400/25 via-slate-900/60 to-slate-950 p-10 shadow-[0_30px_80px_rgba(245,158,11,0.15)]"
@@ -1228,7 +1652,7 @@ export default function Home() {
                   Финансы, цели, основы бизнеса — без оплаты. Убедись, что формат работает для тебя.
                 </p>
                 <p className="mt-3 text-xs text-slate-300">
-                  8 минут в день — и у бизнеса появляется система роста.
+                  15 минут в день — и у бизнеса появляется система роста.
                 </p>
               </div>
               <div className="hidden items-center gap-3 rounded-2xl glass-panel glass-sheen px-4 py-3 text-sm text-slate-300 lg:flex">
