@@ -388,9 +388,9 @@ function TypingText({ text, delay = 0 }: { text: string; delay?: number }) {
 }
 
 const appStoreUrl =
-  "https://apps.apple.com/app/id000000000?utm_source=landing";
+  "https://apps.apple.com/us/app/id675386549";
 const googlePlayUrl =
-  "https://play.google.com/store/apps/details?id=ru.bizlevel.app&utm_source=landing";
+  "https://play.google.com/apps/testing/kz.bizlevel.bizlevel";
 const promoVideoUrl =
   "https://vz-1d42f250-27d.b-cdn.net/d15b6d05-01c6-4eed-ad06-10e0b2df67fe/playlist.m3u8";
 const promoVideoPoster =
@@ -738,11 +738,11 @@ function LogoMark() {
   return (
     <Link 
       href="/" 
-      className="flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 backdrop-blur-sm transition hover:border-white/25 hover:bg-white/10"
+      className="group flex items-center justify-center rounded-2xl border border-white/70 bg-white px-6 py-2.5 shadow-md shadow-slate-900/30 transition-colors duration-200 hover:border-slate-200 hover:bg-slate-100"
     >
       <Image
         alt="БизЛевел"
-        className="h-8 w-auto object-contain"
+        className="h-8 w-auto object-contain transition duration-200 group-hover:grayscale group-hover:opacity-90"
         src={logoLight}
         priority
       />
@@ -978,17 +978,16 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <LogoMark />
           <MagneticButton
-            href={appStoreUrl}
+            href="https://app.bizlevel.kz/"
             className="hidden rounded-full bg-[#F59E0B] px-6 py-3 text-sm font-semibold text-[#0B1220] shadow-lg shadow-amber-500/20 transition pulse-ring sm:inline-flex"
           >
-            Скачать приложение
+            Войти
           </MagneticButton>
           <a
             className="inline-flex rounded-full border border-white/20 p-2 text-white/80 transition hover:bg-white/10 sm:hidden"
-            href="#download"
-            aria-label="Скачать приложение"
+            href="https://app.bizlevel.kz/"
+            aria-label="Войти"
           >
-            <Download className="h-5 w-5" />
           </a>
         </div>
       </header>
@@ -1033,8 +1032,9 @@ export default function Home() {
                 variants={fadeInUp}
                 className="flex flex-wrap items-center gap-4"
               >
-                <StoreButtons />
-                {/* QR Code - увеличенный до 80px */}
+                {/* На мобильных показываем только ссылки на магазины */}
+                <StoreButtons className="md:hidden" />
+                {/* На десктопе показываем только QR (hidden до md) */}
                 <div className="hidden items-center gap-3 rounded-2xl glass-panel glass-sheen px-4 py-3 text-sm text-slate-300 md:flex">
                   <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-white/20 bg-white p-1">
                     <Image
@@ -1669,7 +1669,8 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex flex-col gap-4">
-                <StoreButtons className="justify-start" />
+                {/* На мобильных и планшетах показываем ссылки на магазины, на десктопе — только QR */}
+                <StoreButtons className="justify-start lg:hidden" />
               </div>
             </div>
           </motion.div>
