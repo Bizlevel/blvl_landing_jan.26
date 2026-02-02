@@ -37,7 +37,16 @@ export const metadata: Metadata = {
     title: "БизЛевел — прокачай бизнес-навыки",
     description:
       "15 минут в день. Персональный AI-тренер. Готовые артефакты для бизнеса.",
-    images: ["/og-image.svg"],
+      images: ["/og-image.svg"],
+  },
+  icons: {
+    icon: [
+      {
+        url: "/logo_light-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+    ],
   },
 };
 
