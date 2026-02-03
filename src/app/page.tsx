@@ -40,7 +40,7 @@ import {
 } from "react";
 import iphoneFrame from "./assets/apple-iphone-17-pro-max-2025-medium.png";
 import logoLight from "./assets/logo_light.png";
-import qrTemplate from "./assets/qr_template.png";
+import qrImg from "./qr.png";
 
 // Placeholder imports for mentor avatars - replace with actual images
 // import leoAvatar from "./assets/leo-avatar.png";
@@ -1035,14 +1035,14 @@ export default function Home() {
                 {/* На мобильных показываем только ссылки на магазины */}
                 <StoreButtons className="md:hidden" />
                 {/* На десктопе показываем только QR (hidden до md) */}
-                <div className="hidden items-center gap-3 rounded-2xl glass-panel glass-sheen px-4 py-3 text-sm text-slate-300 md:flex">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-white/20 bg-white p-1">
-                    <Image
-                      alt="QR код для скачивания"
-                      className="h-full w-full rounded-lg"
-                      src={qrTemplate}
-                    />
-                  </div>
+                 <div className="hidden items-center gap-3 rounded-2xl glass-panel glass-sheen px-4 py-3 text-sm text-slate-300 md:flex">
+                   <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-white/20 bg-white p-1">
+                     <Image
+                       alt="QR код для скачивания"
+                       className="h-full w-full rounded-lg"
+                       src={qrImg}
+                     />
+                   </div>
                   <div className="text-xs">
                     Наведи камеру — скачай
                     <span className="block text-[11px] text-slate-400">
@@ -1660,7 +1660,7 @@ export default function Home() {
                   <Image
                     alt="QR код для скачивания"
                     className="h-full w-full rounded-lg"
-                    src={qrTemplate}
+                    src={qrImg}
                   />
                 </div>
                 <div className="text-xs">
