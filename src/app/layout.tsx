@@ -42,9 +42,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/logo_light-192.png",
+        url: "/logo_light-192.ico",
         sizes: "192x192",
-        type: "image/png",
+        type: "image/x-icon",
       },
     ],
   },

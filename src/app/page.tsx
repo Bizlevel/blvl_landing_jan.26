@@ -738,11 +738,11 @@ function LogoMark() {
   return (
     <Link 
       href="/" 
-      className="group flex items-center justify-center rounded-2xl border border-white/70 bg-white px-6 py-2.5 shadow-md shadow-slate-900/30 transition-colors duration-200 hover:border-slate-200 hover:bg-slate-100"
+      className="group flex items-center justify-center rounded-2xl bg-transparent px-6 py-2.5 shadow-md shadow-slate-900/30 transition-colors duration-200 hover:border-white/70"
     >
       <Image
         alt="БизЛевел"
-        className="h-8 w-auto object-contain transition duration-200 group-hover:grayscale group-hover:opacity-90"
+        className="h-16 w-auto object-contain transition duration-200 group-hover:grayscale group-hover:opacity-90"
         src={logoLight}
         priority
       />
